@@ -7,8 +7,10 @@ requires-python = ">=3.12.3"
 dependencies = [
     "numpy>=2.3.3",
     "pandas>=2.3.3",
+    "plotly>=6.3.1",
     "psycopg2-binary>=2.9.10",
     "requests>=2.32.5",
     "sqlalchemy>=2.0.43",
+    "streamlit>=1.50.0",
     "yfinance>=0.2.66",
 ]
