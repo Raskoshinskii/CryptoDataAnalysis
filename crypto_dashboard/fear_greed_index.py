@@ -3,10 +3,13 @@ import pandas as pd
 import logging
 
 from typing import Union
+from functions import format_timedelta
 
-# configure logging
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
+
+from constants import FEAR_GREED_INDEX_URL
+URL = FEAR_GREED_INDEX_URL
 
 
 def get_index(
@@ -29,46 +32,19 @@ def get_index(
     """
     url = url.format(limit=limit, format=format)
     try:
-        response = requests.get(url, timeout=timeout)
-        return response.json()
+        response = requests.get(url, timeout=timeout).json()
+        raw = response['data']
+        df = pd.DataFrame(raw)
+        df['value'] = pd.to_numeric(df['value'], errors='coerce')
+        df['value_classification'] = df['value_classification'].astype('str')
+        df['timestamp'] = pd.to_numeric(df['timestamp'])
+        df['date'] = pd.to_datetime(df['timestamp'], unit='s')
+        df.sort_values(by = 'date', ascending = False)
+        df['time_until_update'] = pd.to_numeric(df['time_until_update'])
+        df['time_until_update'] = pd.to_timedelta(df['time_until_update'], unit='s')
+        df['time_until_update'] = format_timedelta(df['time_until_update'])
+        df.drop(columns = 'timestamp', inplace = True)
+        return df
     except requests.exceptions.RequestException as e:
         logger.error("Error getting Fear & Greed data: %s", e)
         return None
-
-
-def index_data_to_pandas(index_data: dict) -> Union[pd.DataFrame, None]:
-    """
-    Converts the Fear & Greed Index data into a pd.DataFrame.
-
-    Parameters:
-    - index_data (dict): 
-        The Fear & Greed Index data.
-
-    Returns:
-    - pd.DataFrame | None: 
-        A DataFrame containing the index data, or None if input is invalid.
-    """
-    # delete later
-    columns_to_drop = [
-        'timestamp',
-        'time_until_update'
-    ]
-
-    try:
-        df = pd.DataFrame(index_data)
-        # preprocess data
-        df['value'] = pd.to_numeric(df['value'], errors='coerce')
-        df['value_classification'] = df['value_classification'].astype('str')
-        df['date'] = pd.to_datetime(df['timestamp'], unit='s')
-        df.drop(columns=columns_to_drop, inplace=True)
-        return df.sort_values(by='date').reset_index(drop=True)
-    except Exception as e:
-        logger.info("Error processing data into DataFrame: %s", e)
-        return None
-    
-
-def get_index_data(url: str, limit: int = 10, format: str = "json") -> Union[pd.DataFrame, None]:
-    """
-    """
-    index_data = get_index(url=url, limit=limit, format=format)
-    return index_data_to_pandas(index_data=index_data)

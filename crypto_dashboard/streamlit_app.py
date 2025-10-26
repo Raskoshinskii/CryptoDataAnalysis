@@ -2,38 +2,25 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 
-from fear_greed_index import get_index_data
+from fear_greed_index import get_index
 from constants import FEAR_GREED_INDEX_URL
-
 URL = FEAR_GREED_INDEX_URL
-
-
-def get_fear_greed_color(value):
-    """
-    Returns color based on Fear & Greed Index value.
-    """
-    if value <= 25:
-        return "#FF0000"  # Extreme Fear - Red
-    elif value <= 45:
-        return "#FF8C00"  # Fear - Orange
-    elif value <= 55:
-        return "#FFD700"  # Neutral - Yellow
-    elif value <= 75:
-        return "#90EE90"  # Greed - Light Green
-    else:
-        return "#00FF00"  # Extreme Greed - Green
+from functions import create_gauge
+from stockmarket import get_raw_stockmarket_data, get_yearly_stockmarket_trend
+from stockmarket import get_montly_stockmarket_trend, get_yearly_stockmarket_data_for_dashboard
+from inflation import get_cpi, get_inflation
 
 def main():
     # Page configuration
     st.set_page_config(
-        page_title="Crypto Fear & Greed Index Dashboard",
+        page_title="Dashboard to Verify the crypto Fear & Greed index",
         page_icon="📈",
         layout="wide",
         initial_sidebar_state="expanded"
     )
 
     # Title and description
-    st.title("📈 Crypto Fear & Greed Index Dashboard")
+    st.title("📈 Dashboard to Verify the crypto Fear & Greed index")
     st.markdown("""
     The Fear & Greed Index is a sentiment indicator that measures crypto market emotions on a scale of 0-100.
     - **0-25**: Extreme Fear (Red) 😰
@@ -44,14 +31,12 @@ def main():
     """)
 
     # Sidebar controls
-    st.sidebar.header("⚙️ Controls")
+    st.sidebar.header("⚙️ What do you want to do with crypto?")
     
     # Data limit selector
-    data_limit = st.sidebar.selectbox(
-        "Select data range:",
-        options=[7, 30, 60, 100, 200],
-        index=2,
-        help="Number of days of historical data to fetch"
+    data_choice = st.sidebar.selectbox(
+        label = 'Choose an option:',
+        options=['I want to buy crypto', 'I want to sell crypto']
     )
 
     # Auto-refresh option
@@ -62,23 +47,23 @@ def main():
 
     # Fetch data
     with st.spinner("Fetching Fear & Greed Index data..."):
-        df = get_index_data(URL, limit=data_limit, format="json")
+        df = get_index(URL, limit=360, format="json")
 
     if df is None or df.empty:
         st.error("❌ Unable to fetch data. Please try again later.")
         return
 
     # Current index value
-    current_value = df.iloc[-1]['value']
-    current_classification = df.iloc[-1]['value_classification']
-    current_date = df.iloc[-1]['date'].strftime('%Y-%m-%d')
+    current_value = df.iloc[0]['value']
+    current_classification = df.iloc[0]['value_classification']
+    current_date = df.iloc[0]['date'].strftime('%Y-%m-%d')
     
     # Main metrics
     col1, col2, col3 = st.columns(3)
     
     with col1:
         st.metric(
-            label="Current Index",
+            label="Crypto Fear & Greed Index Today",
             value=f"{current_value}",
             delta=None
         )
@@ -100,30 +85,7 @@ def main():
     # Gauge chart for current value
     st.subheader("📊 Current Fear & Greed Level")
     
-    fig_gauge = go.Figure(go.Indicator(
-        mode = "gauge+number+delta",
-        value = current_value,
-        domain = {'x': [0, 1], 'y': [0, 1]},
-        title = {'text': "Fear & Greed Index"},
-        gauge = {
-            'axis': {'range': [None, 100]},
-            'bar': {'color': get_fear_greed_color(current_value)},
-            'steps': [
-                {'range': [0, 25], 'color': "lightgray"},
-                {'range': [25, 45], 'color': "gray"},
-                {'range': [45, 55], 'color': "lightgray"},
-                {'range': [55, 75], 'color': "gray"},
-                {'range': [75, 100], 'color': "lightgray"}
-            ],
-            'threshold': {
-                'line': {'color': "red", 'width': 4},
-                'thickness': 0.75,
-                'value': 90
-            }
-        }
-    ))
-    
-    fig_gauge.update_layout(height=400)
+    fig_gauge = create_gauge(current_value)
     st.plotly_chart(fig_gauge, use_container_width=True)
 
     # Historical trend
@@ -131,10 +93,10 @@ def main():
     
     # Line chart
     fig_line = px.line(
-        df, 
+        df,
         x='date', 
         y='value',
-        title=f"Fear & Greed Index - Last {data_limit} Days",
+        title=f"Fear & Greed Index - Last 360 Days",
         labels={'date': 'Date', 'value': 'Index Value'},
         color_discrete_sequence=['#1f77b4']
     )
@@ -155,62 +117,75 @@ def main():
     
     st.plotly_chart(fig_line, use_container_width=True)
 
-    # Distribution analysis
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("📊 Value Distribution")
-        fig_hist = px.histogram(
-            df, 
-            x='value', 
-            nbins=20, 
-            title="Distribution of Index Values",
-            labels={'value': 'Index Value', 'count': 'Frequency'}
-        )
-        fig_hist.update_layout(height=400)
-        st.plotly_chart(fig_hist, use_container_width=True)
-    
-    with col2:
-        st.subheader("🏷️ Classification Breakdown")
-        classification_counts = df['value_classification'].value_counts()
-        fig_pie = px.pie(
-            values=classification_counts.values,
-            names=classification_counts.index,
-            title="Distribution by Classification"
-        )
-        fig_pie.update_layout(height=400)
-        st.plotly_chart(fig_pie, use_container_width=True)
+    # Stockmarket
+    raw_sm = get_raw_stockmarket_data()
+    sm = get_yearly_stockmarket_data_for_dashboard(raw_sm)
+    curr_sm = sm.iloc[-1]['stockmarket_value']
+    monthly_sm = get_montly_stockmarket_trend(raw_sm)
+    yearly_sm = get_yearly_stockmarket_trend(raw_sm)
 
-    # Statistics
-    st.subheader("📋 Statistical Summary")
+    #calculate montly rise / fall:
     
-    col1, col2, col3, col4 = st.columns(4)
+    monthly_change = (
+        (sm.iloc[-1]['stockmarket_value'] - sm.iloc[-25]['stockmarket_value'])
+        / sm.iloc[-25]['stockmarket_value']
+        ) * 100
+    
+    #calculate yearly rise / fall:
+    yearly_change = (
+        (sm.iloc[-1]['stockmarket_value'] - sm.iloc[0]['stockmarket_value'])
+        / sm.iloc[0]['stockmarket_value']
+        ) * 100
+
+    st.header("👩‍💼 Stock market")
+    col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.metric("Average", f"{df['value'].mean():.1f}")
+        st.metric('Current stock market value', f'{curr_sm:.2f}')
     
     with col2:
-        st.metric("Median", f"{df['value'].median():.1f}")
-    
+        monthly_trend_value = monthly_sm.iloc[0]['stockmarket']
+        monthly_direction = 'normal' if monthly_trend_value == 'Rising' else 'inverse' if monthly_trend_value == 'Falling' else 'off'
+        
+        st.metric(
+            label = 'Monthly stock market trend',
+            value=monthly_trend_value,
+            delta = f"{monthly_change:.2f}%",
+            delta_color=monthly_direction)
+
     with col3:
-        st.metric("Minimum", f"{df['value'].min():.1f}")
+        yearly_trend_value = yearly_sm.iloc[0]['stockmarket']
+        yearly_direction = 'normal' if monthly_trend_value == 'Rising' else 'inverse' if monthly_trend_value == 'Falling' else 'off'
+        
+        st.metric(
+            label = 'Yearly stock market trend',
+            value=yearly_trend_value,
+            delta = f"{yearly_change:.2f}%",
+            delta_color=yearly_direction)
+
+    #Stockmarket long-term trend
+    st.subheader('Stock market value distribution')
+    st.area_chart(sm.set_index('date')['stockmarket_value'])
+
+    #Inflation
+    cpi = get_cpi()
+    inflation = get_inflation(cpi)
+    current_inflation = inflation.iloc[0]['current_inflation']
+    inflation_growth = inflation.iloc[0]['inflation_growth']
+    inflation_estimate = inflation.iloc[0]['inflation_estimate']
+
+    st.header("💸 Inflation")
+    col1, col2, col3 = st.columns(3)
     
-    with col4:
-        st.metric("Maximum", f"{df['value'].max():.1f}")
+    with col1:
+        st.metric(label='Current Inflation', value = f"{current_inflation}%")
+    
+    with col2:
+        st.metric(label='Inflation growth', value = f"{inflation_growth}%")
 
-    # Raw data table
-    if st.expander("📋 View Raw Data"):
-        st.dataframe(
-            df.sort_values('date', ascending=False),
-            use_container_width=True,
-            hide_index=True
-        )
+    with col3:
+        st.metric(label='Inflation estimate', value = f"{inflation_estimate}")
 
-    # Footer
-    st.markdown("---")
-    st.markdown(
-        "📊 **Data Source**: [Alternative.me Crypto Fear & Greed Index](https://alternative.me/crypto/fear-and-greed-index/)"
-    )
 
 if __name__ == "__main__":
     main()
