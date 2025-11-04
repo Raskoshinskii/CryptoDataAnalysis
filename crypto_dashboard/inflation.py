@@ -48,13 +48,17 @@ def get_cpi(
 
         #sort by "date" in descending order
         data.sort_values(by = 'date', ascending=False, inplace = True)
+        data.reset_index(drop=True, inplace=True)
+
+        data['hist_inf_rate'] = round((((data['value'] / data['value'].shift(-1)) - 1) * 100) * 10, 1)
+        data['date_formatted'] = data['date'].dt.strftime("%B %y")
 
         return data
 
     except requests.exceptions.RequestException as e:
         logger.error("Error getting fear & greed data: %s", e)
         return None
-
+    
 def get_inflation(data: pd.DataFrame) -> Union[pd.DataFrame, None]:
     """
     Converts dict with cpi indexes into dataframe showing inflation estimate: "High", "Moderate", "Low".

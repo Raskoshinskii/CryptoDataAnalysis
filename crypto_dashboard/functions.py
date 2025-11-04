@@ -1,6 +1,7 @@
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
+import math
 
 def format_timedelta(td_series):
     """Convert timedelta to readable format '00 hours and 00 minutes' """
@@ -13,32 +14,46 @@ def format_timedelta(td_series):
     res.iloc[0] = formatted
     return res
 
-def create_gauge(value, title_text="Fear & Greed Index"):
+def create_gauge(value):
     """
     Create a gauge with smooth gradient
     """
+    # Calculate color based on current value (red -> yellow -> green)
+    if value <= 50:
+        # Red to Yellow
+        r = 255
+        g = int(255 * (value / 50))
+        b = 0
+    else:
+        # Yellow to Green
+        r = int(255 * (1 - (value - 50) / 50))
+        g = 255
+        b = 0
+    
+    number_color = f'rgb({r}, {g}, {b})'
+    
     # Create smooth gradient by adding many small steps
     steps = []
     for i in range(100):
         # Calculate color based on position (red -> yellow -> green)
         if i <= 50:
             # Red to Yellow
-            r = 255
-            g = int(255 * (i / 50))
-            b = 0
+            r_step = 255
+            g_step = int(255 * (i / 50))
+            b_step = 0
         else:
             # Yellow to Green
-            r = int(255 * (1 - (i - 50) / 50))
-            g = 255
-            b = 0
-        color = f'rgb({r}, {g}, {b})'
+            r_step = int(255 * (1 - (i - 50) / 50))
+            g_step = 255
+            b_step = 0
+        color = f'rgb({r_step}, {g_step}, {b_step})'
         steps.append({'range': [i, i+1], 'color': color})
+    
     fig = go.Figure(go.Indicator(
         mode = "gauge+number",
         value = value,
         domain = {'x': [0, 1], 'y': [0, 1]},
-        title={'text': title_text, 'font': {'size': 15}},
-        number = {'font': {'size': 18, 'color':  'black'},
+        number = {'font': {'size': 48, 'color': number_color},  # Use dynamic color here
                   'suffix': '',
                   'valueformat': 'd'},
         gauge = {
@@ -58,49 +73,125 @@ def create_gauge(value, title_text="Fear & Greed Index"):
             }
         }
     ))
+    
     fig.update_layout(
-        shapes = [
-            {
-                'type': 'rect',
-                'xref': 'paper',
-                'yref': 'paper',
-                'x0': 0,
-                'y0': 0,
-                'x1': 1,
-                'y1': 1,
-                'line': {
-                    'color': 'white',
-                    'width': 2,
-                }
-            }
-        ],
-        title={
-            'text': title_text,
-            'y': 0.95,
-            'x': 0.5,
-            'xanchor': 'center',
-            'yanchor': 'top',
-            'font': {'size': 15}
-        },
         height=150,
-        margin=dict(l=20, r=20, t=55, b=20),
+        margin=dict(l=20, r=20, t=20, b=20),
         paper_bgcolor='dark blue',
         font={'family': 'Arial'}
     )
     return fig
-
-
-def get_fear_greed_color(value):
-    """
-    Returns color based on Fear & Greed Index value.
-    """
-    if value <= 25:
-        return "#FF0000"  # Extreme Fear - Red
-    elif value <= 45:
-        return "#FF8C00"  # Fear - Orange
-    elif value <= 55:
-        return "#FFD700"  # Neutral - Yellow
-    elif value <= 75:
-        return "#90EE90"  # Greed - Light Green
+    
+def get_index_recommendation(current_value):
+    if current_value <= 50:
+        return "buy."
+    elif current_value <= 100:
+        return "sell."
+    
+def traffic_lights(value):
+    if value == "It's safe to buy!" or value == "Sell now! The Crypto market is a bubble!":
+        active_color = "green"
+    elif value == "Stop! Don't buy!" or value == "Don't sell! Crypto will rise further!":
+        active_color = "red"
+    elif value == "Wait! The market is uncertain!":
+        active_color = "yellow"
     else:
-        return "#00FF00"  # Extreme Greed - Green
+        active_color = "gray"
+
+    #Traffic lights CSS
+    st.markdown("""
+    <style>
+    .traffic-light {
+        width: 100px;
+        background-color: #333;
+        border-radius: 15px;
+        padding: 15px;
+        margin: 20x auto;
+        border: 3px solid #555;
+    }
+    .light {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        margin: 10px auto;
+        border: 2px solid #666;
+        background-color: #222;
+    }
+    .red.active { background-color: #ff4444; box-shadow: 0 0 20px #ff4444; }
+    .yellow.active { background-color: #ffff44; box-shadow: 0 0 20px #ffff44; }
+    .green.active { background-color: #44ff44; box-shadow: 0 0 20px #44ff44; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown(f"""
+    <div class="traffic-light">
+        <div class="light red {'active' if active_color == 'red' else ''}"></div>
+        <div class="light yellow {'active' if active_color == 'yellow' else ''}"></div>
+        <div class="light green {'active' if active_color == 'green' else ''}"></div>
+        
+    </div>
+    """, unsafe_allow_html=True)
+
+def get_recommendation(df_index, lt_trend, df_stockmarket, df_inflation):
+    if df_index.iloc[0]['value_classification'] == 'Fear' or df_index.iloc[0]['value_classification'] == 'Extreme Fear' \
+        or df_index.iloc[0]['value_classification'] == 'Neutral' and \
+        lt_trend == 'Long-term trend is stable' or lt_trend == 'Long-term trend is unstable' and \
+        df_stockmarket.iloc['stockmarket'] == 'Rising' and \
+            df_inflation.iloc[0]['inflation'] == 'Low' or df_inflation.iloc[0]['inflation'] == 'Moderate':
+        return "It's safe to buy!"
+    
+    elif df_index.iloc[0]['value_classification'] == 'Fear' or df_index.iloc[0]['value_classification'] == 'Extreme Fear' and \
+    lt_trend == 'Long-term trend is stable' or lt_trend == 'Long-term trend is unstable' and \
+        df_stockmarket.iloc[0]['stockmarket'] == 'Falling' and \
+            df_inflation.iloc[0]['inflation'] == 'Low' or df_inflation.iloc[0]['inflation'] == 'Moderate' or \
+            df_inflation.iloc[0]['inflation'] == 'High':
+        return "Stop! Don't buy!"
+    
+    elif df_index.iloc[0]['value_classification'] == 'Greed' or  df_index.iloc[0]['value_classification'] == 'Extreme Greed' and \
+    lt_trend == 'Long-term trend is stable' or lt_trend == 'Long-term trend is unstable' and \
+        df_stockmarket.iloc[0]['stockmarket'] == 'Rising' and \
+            df_inflation.iloc[0]['inflation'] == 'Low' or df_inflation.iloc[0]['inflation'] == 'Moderate':
+        return "Don't sell! Crypto will rise further!"
+    
+    elif df_index.iloc[0]['value_classification'] == 'Greed' or  df_index.iloc[0]['value_classification'] == 'Extreme Greed' and \
+    lt_trend == 'Long-term trend is stable' or lt_trend == 'Long-term trend is unstable' and \
+        df_stockmarket.iloc[0]['stockmarket'] == 'Falling' and \
+            df_inflation.iloc[0]['inflation'] == 'Low' or df_inflation.iloc[0]['inflation'] == 'Moderate' or \
+            df_inflation.iloc[0]['inflation'] == 'High':
+        return "Sell now! The Crypto market is a bubble!"
+    
+    elif df_index.iloc[0]['value_classification'] == 'Neutral' and \
+    lt_trend == 'Long-term trend is stable' or lt_trend == 'Long-term trend is unstable' and \
+        df_stockmarket.iloc[0]['stockmarket'] == 'Rising' and \
+            df_inflation.iloc[0]['inflation'] == 'Low' or df_inflation.iloc[0]['inflation'] == 'Moderate' or \
+            df_inflation.iloc[0]['inflation'] == 'High':
+        return "It's safe to buy!"
+    
+    elif df_index.iloc[0]['value_classification'] == 'Neutral' and \
+    lt_trend == 'Long-term trend is stable' or lt_trend == 'Long-term trend is unstable' and \
+        df_stockmarket.iloc[0]['stockmarket'] == 'Falling' and \
+            df_inflation.iloc[0]['inflation'] == 'Low' or df_inflation.iloc[0]['inflation'] == 'Moderate' or \
+            df_inflation.iloc[0]['inflation'] == 'High':
+        return "Wait! The market is uncertain!"
+    
+def get_index_trend(df):
+    value = df.iloc[0]['value_classification']
+    if value == "Fear" or value == "Extreme Fear":
+        ef_list = []
+        for i in range(21):
+            if df.iloc[i]['value'] >= 0 and df.iloc[i]['value'] <= 47:
+                ef_list.append(i)
+        if len(ef_list) >= 18:
+            return "Stable"
+        else:
+            return "Unstable"
+    elif value == "Greed" or value == "Extreme Greed":
+        eg_list = []
+        for i in range(21):
+            if df.iloc[i]['value'] >= 55 and df.iloc[i]['value'] <= 100:
+                eg_list.append(i)
+        if len(eg_list) >= 18:
+            return "Long-term trend is stable"
+        else:
+            return "Long-term trend is unstable"
+        
