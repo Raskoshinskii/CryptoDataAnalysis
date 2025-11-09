@@ -14,8 +14,9 @@ from stockmarket import get_raw_stockmarket_data, get_yearly_stockmarket_trend
 from stockmarket import get_montly_stockmarket_trend, get_yearly_stockmarket_data_for_dashboard
 from inflation import get_cpi, get_inflation
 
+st.set_page_config(layout='wide')
+
 def main():
-    st.set_page_config(layout='wide')
 
     # More comprehensive CSS for centering
     st.markdown("""
@@ -112,7 +113,6 @@ def main():
                     st.rerun()
 
     elif st.session_state.page == "analysis":
-        st.set_page_config(layout='wide')
 
         df_index = get_index(URL, limit=30, format="json")
         lt_trend = get_index_trend(df_index)
@@ -226,9 +226,35 @@ def main():
             monthly_trend_value = monthly_sm.iloc[0]['stockmarket']
             st.subheader(f"👩‍💼 Stock market: {monthly_trend_value}")
 
-            st.metric('Current value', f'{curr_sm:.2f}', border = True)
-            st.metric('A month ago', f'{month_sm:.2f}')
-            st.metric('A year ago', f'{year_sm:.2f}')
+            st.markdown("""
+            <style>
+            div[data-testid='metric-container']{
+                        text-align: center !important;
+                        justify-content: center !important;
+            }
+            [data-testid='stMetricValue']{
+                        font-size: 20px;
+                        text-align: center !important;
+                        justify-content: center !important;
+                        align-items: center !important;
+            }
+            [data-testid='stMetricLabel']{
+                        font-size: 16px;
+                        text-align: center !important;
+                        justify-content: center !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            cur_col = st.columns(1)[0]
+            with cur_col:
+                st.metric('Current S&P 500 value', f'{curr_sm:.2f}', border=True)
+
+            scol1, scol2 = st.columns(2)
+            
+            with scol1:
+                st.metric('S&P 500 a month ago', f'{month_sm:.2f}', border=True, height='stretch', width='stretch')
+            with scol2:
+                st.metric('S&P 500 a year ago', f'{year_sm:.2f}', border=True, height='stretch', width='stretch')
 
             sm1_col1, sm1_col2 = st.columns(2)
 
@@ -240,7 +266,7 @@ def main():
                     label = 'Monthly trend',
                     value=monthly_trend_value,
                     delta = f"{monthly_change:.2f}%",
-                    delta_color=monthly_direction)
+                    delta_color=monthly_direction, border=True, height='stretch', width='stretch')
             
             with sm1_col2:
                 yearly_trend_value = yearly_sm.iloc[0]['stockmarket']
@@ -250,7 +276,7 @@ def main():
                     label = 'Yearly trend',
                     value=yearly_trend_value,
                     delta = f"{yearly_change:.2f}%",
-                    delta_color=yearly_direction)
+                    delta_color=yearly_direction, border=True, height='stretch', width='stretch')
                 
             #Stockmarket long-term trend
             st.subheader('Yearly trend')
@@ -266,9 +292,11 @@ def main():
             inflation_estimate = inflation.iloc[0]['inflation_estimate']
             
             st.subheader(f"💸 Inflation: {inflation_estimate}")
-
-            st.metric(label='Current', value = f"{current_inflation}%")
-            st.metric(label='Growth', value = f"{inflation_growth}%")
+            inf_col1, inf_col2 = st.columns(2)
+            with inf_col1:
+                st.metric(label='Current', value = f"{current_inflation}%", border=True, height='stretch', width='stretch')
+            with inf_col2:
+                st.metric(label='Growth', value = f"{inflation_growth}%", border=True, height='stretch', width='stretch')
 
             #Long-term inflatioin trend
             cpi = get_cpi()
