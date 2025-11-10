@@ -1,9 +1,5 @@
-import os
-from dotenv import load_dotenv
-load_dotenv()
-
-infl_api_url = os.getenv('infl_api_url')
-infl_api_key = os.getenv('infl_api_key')
+from constants import infl_api_url
+from constants import infl_api_key
 
 from datetime import datetime
 import requests
