@@ -16,9 +16,10 @@ from inflation import get_cpi, get_inflation
 
 st.set_page_config(layout='wide')
 
-def main():
-
-    # More comprehensive CSS for centering
+def main() -> None:
+    """
+    Main Streamlit appliccation for crypto market analysis
+    """
     st.markdown("""
     <style>
     /* Center all text in the app */

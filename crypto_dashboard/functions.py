@@ -1,10 +1,13 @@
+import math
+import pandas as pd
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
-import math
+from plotly.graph_objects import Figure
+from typing import Union
 
-def format_timedelta(td_series):
-    """Convert timedelta to readable format '00 hours and 00 minutes' """
+def format_timedelta(td_series: pd.Series) -> str:
+    """Convert timedelta to readable format '00 hours and 00 minutes'"""
     data = td_series.iloc[0]
     total_seconds = data.total_seconds()
     hours = int((total_seconds // 3600))
@@ -14,7 +17,7 @@ def format_timedelta(td_series):
     res.iloc[0] = formatted
     return res
 
-def create_gauge(value):
+def create_gauge(value: Union[int, float]) -> Figure:
     """
     Create a gauge with smooth gradient
     """
@@ -82,13 +85,16 @@ def create_gauge(value):
     )
     return fig
     
-def get_index_recommendation(current_value):
+def get_index_recommendation(current_value: int) -> str:
+    """ Returns string based on inputed numeric value. """
     if current_value <= 50:
         return "buy."
     elif current_value <= 100:
         return "sell."
     
-def traffic_lights(value):
+def traffic_lights(value: str) -> None:
+    """ Displays traffic lights visualization based on the trading recommendations. """
+
     if value == "It's safe to buy!" or value == "Sell now! The Crypto market is a bubble!":
         active_color = "green"
     elif value == "Stop! Don't buy!" or value == "Don't sell! Crypto will rise further!":
@@ -132,7 +138,9 @@ def traffic_lights(value):
     </div>
     """, unsafe_allow_html=True)
 
-def get_recommendation(df_index, lt_trend, df_stockmarket, df_inflation):
+def get_recommendation(df_index: str, lt_trend: str, df_stockmarket: str, df_inflation: str) -> str:
+    """ Generate trading recommendation based on multiple market indicators. """
+
     if df_index.iloc[0]['value_classification'] == 'Fear' or df_index.iloc[0]['value_classification'] == 'Extreme Fear' \
         or df_index.iloc[0]['value_classification'] == 'Neutral' and \
         lt_trend == 'Long-term trend is stable' or lt_trend == 'Long-term trend is unstable' and \
@@ -174,7 +182,8 @@ def get_recommendation(df_index, lt_trend, df_stockmarket, df_inflation):
             df_inflation.iloc[0]['inflation'] == 'High':
         return "Wait! The market is uncertain!"
     
-def get_index_trend(df):
+def get_index_trend(df: pd.DataFrame) -> str:
+    """ Determine if Fear & Greed Index trend is stable or not """
     value = df.iloc[0]['value_classification']
     if value == "Fear" or value == "Extreme Fear":
         ef_list = []
